@@ -1,0 +1,436 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+env:
+  GO_VERSION: '1.23'
+  NODE_VERSION: '20'
+
+jobs:
+  generate-icons:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install Pillow
+        run: pip install Pillow
+
+      - name: Generate icons from source
+        working-directory: Wails
+        run: python3 tools/icongen/main.py --project-root .
+
+      - name: Upload icon artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: icons
+          path: |
+            Wails/build/appicon.png
+            Wails/build/bin/
+            Wails/build/windows/icon.ico
+            Wails/build/icons/
+            Wails/frontend/src/assets/images/logo.png
+          retention-days: 1
+
+  fetch-xray:
+    runs-on: ubuntu-latest
+    outputs:
+      xray_version: ${{ steps.resolve.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Resolve Xray version
+        id: resolve
+        run: |
+          INPUT_VERSION="${{ github.event.inputs.xray_version }}"
+          if [ -z "$INPUT_VERSION" ] || [ "$INPUT_VERSION" = "latest" ]; then
+            VERSION=$(curl -sL https://api.github.com/repos/XTLS/Xray-core/releases/latest | jq -r '.tag_name')
+          else
+            VERSION="$INPUT_VERSION"
+            if [[ ! "$VERSION" =~ ^v ]]; then
+              VERSION="v${VERSION}"
+            fi
+          fi
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "::notice::Xray version: $VERSION"
+
+      - name: Download and extract Xray binaries
+        run: |
+          VERSION="${{ steps.resolve.outputs.version }}"
+          BASE_URL="https://github.com/XTLS/Xray-core/releases/download/${VERSION}"
+
+          declare -A PLATFORMS=(
+            ["darwin-arm64-v8a"]="Xray-macos-arm64-v8a.zip"
+            ["darwin-amd64"]="Xray-macos-64.zip"
+            ["windows-amd64"]="Xray-windows-64.zip"
+            ["linux-amd64"]="Xray-linux-64.zip"
+            ["linux-arm64"]="Xray-linux-arm64-v8a.zip"
+          )
+
+          GEO_EXTRACTED=false
+          for platform in "${!PLATFORMS[@]}"; do
+            zip="${PLATFORMS[$platform]}"
+            dest="Wails/resources/xray/${platform}"
+            mkdir -p "$dest"
+
+            echo "::group::${platform}"
+            echo "Downloading ${zip}..."
+            curl -sL "${BASE_URL}/${zip}" -o "/tmp/${zip}"
+
+            echo "Extracting..."
+            rm -rf /tmp/extract
+            mkdir -p /tmp/extract
+            unzip -q -o "/tmp/${zip}" -d "/tmp/extract"
+
+            if [ "$platform" = "windows-amd64" ]; then
+              mv /tmp/extract/xray.exe "${dest}/xray.exe"
+            else
+              mv /tmp/extract/xray "${dest}/xray"
+              chmod +x "${dest}/xray"
+            fi
+            echo "${VERSION}" > "${dest}/VERSION"
+
+            if [ "$GEO_EXTRACTED" = false ]; then
+              mkdir -p Wails/resources/geo
+              cp /tmp/extract/geoip.dat Wails/resources/geo/
+              cp /tmp/extract/geosite.dat Wails/resources/geo/
+              echo "${VERSION}" > Wails/resources/geo/VERSION
+              GEO_EXTRACTED=true
+              echo "Geo files extracted from ${zip}"
+            fi
+
+            rm -rf "/tmp/${zip}" /tmp/extract
+            echo "::endgroup::"
+          done
+
+          echo "::group::Resource summary"
+          find Wails/resources -type f | sort
+          echo "::endgroup::"
+
+      - name: Upload resources artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: resources
+          path: Wails/resources/
+          retention-days: 1
+
+  build-macos-arm64:
+    needs: [fetch-xray, generate-icons]
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install Wails
+        run: go install github.com/wailsapp/wails/v2/cmd/wails@latest
+
+      - name: Download resources
+        uses: actions/download-artifact@v4
+        with:
+          name: resources
+          path: Wails/resources/
+
+      - name: Download icons
+        uses: actions/download-artifact@v4
+        with:
+          name: icons
+          path: Wails/
+
+      - name: Install Pillow
+        run: pip install Pillow
+
+      - name: Generate macOS .icns
+        working-directory: Wails
+        run: python3 tools/icongen/main.py --project-root . --source build/appicon.png
+
+      - name: Trim resources to platform
+        working-directory: Wails
+        run: |
+          PLATFORM="darwin-arm64-v8a"
+          for dir in resources/xray/*/; do
+            name=$(basename "$dir")
+            if [ "$name" != "$PLATFORM" ]; then rm -rf "$dir"; fi
+          done
+          chmod +x resources/xray/*/xray 2>/dev/null || true
+          find resources -type f | sort
+
+      - name: Build application
+        working-directory: Wails
+        run: wails build -platform darwin/arm64
+
+      - name: Bundle resources into app
+        working-directory: Wails
+        run: |
+          cp -R resources/ build/bin/SwiftRay.app/Contents/Resources/
+
+      - name: Create DMG
+        working-directory: Wails/build/bin
+        run: |
+          STAGING=$(mktemp -d)
+          cp -R SwiftRay.app "$STAGING/"
+          ln -s /Applications "$STAGING/Applications"
+          hdiutil create -volname "SwiftRay" -srcfolder "$STAGING" -ov -format UDZO -imagekey zlib-level=9 "SwiftRay-macos-arm64.dmg"
+          rm -rf "$STAGING"
+
+      - name: Upload DMG
+        uses: actions/upload-artifact@v4
+        with:
+          name: SwiftRay-macos-arm64
+          path: Wails/build/bin/SwiftRay-macos-arm64.dmg
+
+  build-macos-amd64:
+    needs: [fetch-xray, generate-icons]
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install Wails
+        run: go install github.com/wailsapp/wails/v2/cmd/wails@latest
+
+      - name: Download resources
+        uses: actions/download-artifact@v4
+        with:
+          name: resources
+          path: Wails/resources/
+
+      - name: Download icons
+        uses: actions/download-artifact@v4
+        with:
+          name: icons
+          path: Wails/
+
+      - name: Install Pillow
+        run: pip install Pillow
+
+      - name: Generate macOS .icns
+        working-directory: Wails
+        run: python3 tools/icongen/main.py --project-root . --source build/appicon.png
+
+      - name: Trim resources to platform
+        working-directory: Wails
+        run: |
+          PLATFORM="darwin-amd64"
+          for dir in resources/xray/*/; do
+            name=$(basename "$dir")
+            if [ "$name" != "$PLATFORM" ]; then rm -rf "$dir"; fi
+          done
+          chmod +x resources/xray/*/xray 2>/dev/null || true
+          find resources -type f | sort
+
+      - name: Build application
+        working-directory: Wails
+        env:
+          GOARCH: amd64
+          CGO_ENABLED: '1'
+          CC: "cc -arch x86_64"
+        run: wails build -platform darwin/amd64
+
+      - name: Bundle resources into app
+        working-directory: Wails
+        run: |
+          cp -R resources/ build/bin/SwiftRay.app/Contents/Resources/
+
+      - name: Create DMG
+        working-directory: Wails/build/bin
+        run: |
+          STAGING=$(mktemp -d)
+          cp -R SwiftRay.app "$STAGING/"
+          ln -s /Applications "$STAGING/Applications"
+          hdiutil create -volname "SwiftRay" -srcfolder "$STAGING" -ov -format UDZO -imagekey zlib-level=9 "SwiftRay-macos-amd64.dmg"
+          rm -rf "$STAGING"
+
+      - name: Upload DMG
+        uses: actions/upload-artifact@v4
+        with:
+          name: SwiftRay-macos-amd64
+          path: Wails/build/bin/SwiftRay-macos-amd64.dmg
+
+  build-windows:
+    needs: [fetch-xray, generate-icons]
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Install Wails
+        run: go install github.com/wailsapp/wails/v2/cmd/wails@latest
+
+      - name: Download resources
+        uses: actions/download-artifact@v4
+        with:
+          name: resources
+          path: Wails/resources/
+
+      - name: Download icons
+        uses: actions/download-artifact@v4
+        with:
+          name: icons
+          path: Wails/
+
+      - name: Trim resources to platform
+        working-directory: Wails
+        shell: bash
+        run: |
+          PLATFORM="windows-amd64"
+          for dir in resources/xray/*/; do
+            name=$(basename "$dir")
+            if [ "$name" != "$PLATFORM" ]; then rm -rf "$dir"; fi
+          done
+          find resources -type f | sort
+
+      - name: Build application and installer
+        working-directory: Wails
+        run: wails build -platform windows/amd64
+
+      - name: Copy resources into build output
+        working-directory: Wails
+        shell: bash
+        run: cp -R resources/ build/bin/resources/
+
+      - name: Package portable ZIP
+        working-directory: Wails/build/bin
+        shell: bash
+        run: 7z a -tzip "SwiftRay-windows-amd64.zip" SwiftRay.exe resources/
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: SwiftRay-windows
+          path: Wails/build/bin/SwiftRay-windows-amd64.zip
+
+  build-linux-amd64:
+    needs: [fetch-xray, generate-icons]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libgtk-3-dev \
+            libwebkit2gtk-4.1-dev \
+            libjavascriptcoregtk-4.1-dev \
+            pkg-config \
+            libayatana-appindicator3-dev
+
+      - name: Install Wails
+        run: go install github.com/wailsapp/wails/v2/cmd/wails@latest
+
+      - name: Download resources
+        uses: actions/download-artifact@v4
+        with:
+          name: resources
+          path: Wails/resources/
+
+      - name: Download icons
+        uses: actions/download-artifact@v4
+        with:
+          name: icons
+          path: Wails/
+
+      - name: Trim resources to platform
+        working-directory: Wails
+        run: |
+          PLATFORM="linux-amd64"
+          for dir in resources/xray/*/; do
+            name=$(basename "$dir")
+            if [ "$name" != "$PLATFORM" ]; then rm -rf "$dir"; fi
+          done
+          chmod +x resources/xray/*/xray 2>/dev/null || true
+          find resources -type f | sort
+
+      - name: Build application
+        working-directory: Wails
+        env:
+          CGO_CFLAGS: "-DWEBKITGTK_4_1"
+        run: wails build -platform linux/amd64 -tags webkit2_41
+
+      - name: Copy resources into build output
+        working-directory: Wails
+        run: cp -R resources/ build/bin/resources/
+
+      - name: Package tar.gz
+        working-directory: Wails/build/bin
+        run: tar czf "SwiftRay-linux-amd64.tar.gz" SwiftRay resources/
+
+      - name: Upload tar.gz
+        uses: actions/upload-artifact@v4
+        with:
+          name: SwiftRay-linux-amd64
+          path: Wails/build/bin/SwiftRay-linux-amd64.tar.gz
+
+  release:
+    needs: [build-macos-arm64, build-macos-amd64, build-windows, build-linux-amd64]
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/')
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts/
+
+      - name: List release files
+        run: find artifacts/ -type f | sort
+
+      - name: Create GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: ${{ github.ref_name }}
+          draft: false
+          generate_release_notes: true
+          token: ${{ secrets.GITHUB_TOKEN }}
+          files: |
+            artifacts/SwiftRay-macos-arm64/*.dmg
+            artifacts/SwiftRay-macos-amd64/*.dmg
+            artifacts/SwiftRay-windows/*.zip
+            artifacts/SwiftRay-linux-amd64/*.tar.gz

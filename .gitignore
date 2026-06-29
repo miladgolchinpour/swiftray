@@ -1,0 +1,39 @@
+# macOS
+.DS_Store
+Thumbs.db
+
+# Node
+**/node_modules/
+**/dist/
+**/package.json.md5
+
+# Wails build output
+**/build/bin/
+**/build/release/
+
+# Runtime resources
+**/resources/xray/*/xray
+!resources/xray/*/.gitkeep
+**/resources/xray/*/xray.exe
+**/resources/geo/*.dat
+resources/geo/VERSION
+!resources/geo/.gitkeep
+
+# Logs
+*.log
+
+# Go
+coverage.out
+*.test
+
+# Resource manager temp files
+*.zip
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Environment overrides
+.env.local
