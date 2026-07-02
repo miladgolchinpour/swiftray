@@ -852,9 +852,8 @@ function submitAddManual() {
 }
 
 function handleBulkImport() {
-  for (const n of bulkImportNodes.value) {
-    store.addLocalNode({ ...n, id: crypto.randomUUID() })
-  }
+  const nodes = bulkImportNodes.value.map(n => ({ ...n, id: crypto.randomUUID() }))
+  store.addLocalNodes(nodes)
   showBulkImport.value = false
   showAdd.value = false
   notify.success(`${bulkImportNodes.value.length} nodes imported`)

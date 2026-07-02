@@ -37,11 +37,12 @@ type AppSettings struct {
 	BypassIran           bool   `json:"bypassIran"`
 	BypassRussia         bool   `json:"bypassRussia"`
 	BypassChina          bool   `json:"bypassChina"`
-	PingTestURL          string `json:"pingTestURL"`
-	CustomGeoSources     string `json:"customGeoSources"`
-	Exclusions           string `json:"exclusions"`
+	PingTestURL          string  `json:"pingTestURL"`
+	CustomGeoSources     string  `json:"customGeoSources"`
+	Exclusions           string  `json:"exclusions"`
+	URLTestMode          string  `json:"urlTestMode"`
 	URLTestTimeout       float64 `json:"urlTestTimeout"`
-	URLTestConcurrency   int    `json:"urlTestConcurrency"`
+	URLTestConcurrency   int     `json:"urlTestConcurrency"`
 }
 
 func (s AppSettings) Port() int {
@@ -92,6 +93,7 @@ func DefaultSettings() AppSettings {
 		PingTestURL:           "https://www.google.com/generate_204",
 		CustomGeoSources:      "",
 		Exclusions:            "localhost\n127.0.0.0/8\n::1",
+		URLTestMode:           "tcp",
 		URLTestTimeout:        3.0,
 		URLTestConcurrency:    8,
 	}

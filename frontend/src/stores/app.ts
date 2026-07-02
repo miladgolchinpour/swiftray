@@ -53,6 +53,7 @@ export const useAppStore = defineStore('app', () => {
     pingTestURL: 'https://www.google.com/generate_204',
     customGeoSources: '',
     exclusions: 'localhost\n127.0.0.0/8\n::1',
+    urlTestMode: 'tcp',
     urlTestTimeout: 3,
     urlTestConcurrency: 8,
   })
@@ -152,6 +153,15 @@ export const useAppStore = defineStore('app', () => {
       notify.success('Node added', node.name)
     } else if (error) {
       notify.handleAPIError(error, 'Add node')
+    }
+  }
+
+  async function addLocalNodes(nodes: Node[]) {
+    const { data, error } = await api.addLocalNodes(nodes as any)
+    if (data) {
+      localNodes.value = data as unknown as Node[]
+    } else if (error) {
+      notify.handleAPIError(error, 'Add nodes')
     }
   }
 
@@ -372,6 +382,7 @@ export const useAppStore = defineStore('app', () => {
     loadSettings,
     loadLocalNodes,
     addLocalNode,
+    addLocalNodes,
     updateLocalNode,
     deleteLocalNode,
     setSelectedNodeID,

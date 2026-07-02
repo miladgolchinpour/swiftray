@@ -5,6 +5,8 @@ import {main} from '../models';
 
 export function AddLocalNode(arg1:models.Node):Promise<main.APIResponse>;
 
+export function AddLocalNodes(arg1:Array<models.Node>):Promise<main.APIResponse>;
+
 export function AddSubscription(arg1:string,arg2:string):Promise<main.APIResponse>;
 
 export function CancelDownload():Promise<main.APIResponse>;

@@ -466,6 +466,15 @@ func (a *App) AddLocalNode(node models.Node) APIResponse {
 	return okResponse(nodes)
 }
 
+func (a *App) AddLocalNodes(nodes []models.Node) APIResponse {
+	existing := a.storage.LoadLocalNodes()
+	existing = append(existing, nodes...)
+	if err := a.storage.SaveLocalNodes(existing); err != nil {
+		return errResponse(fmt.Sprintf("failed to save nodes: %v", err))
+	}
+	return okResponse(existing)
+}
+
 func (a *App) UpdateLocalNode(node models.Node) APIResponse {
 	nodes := a.storage.LoadLocalNodes()
 	for i, n := range nodes {
@@ -858,7 +867,7 @@ func (a *App) runURLTest(nodes []models.Node, settings models.AppSettings) APIRe
 	a.logStream.AddFromXray("info", fmt.Sprintf("Starting URL test for %d nodes...", len(nodes)))
 
 	go func() {
-		a.xray.URLTest(nodes, settings.URLTestTimeout, settings.URLTestConcurrency, func(nodeID string, delay *int) {
+		a.xray.URLTest(nodes, settings.URLTestTimeout, settings.URLTestConcurrency, settings.URLTestMode, func(nodeID string, delay *int) {
 			result := URLTestResult{NodeID: nodeID, Delay: delay}
 			data, _ := json.Marshal(result)
 			if a.ctx != nil {

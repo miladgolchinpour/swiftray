@@ -1,5 +1,5 @@
 export type NodeProtocol = 'vmess' | 'vless' | 'trojan' | 'ss'
-export type NodeTransport = 'tcp' | 'ws' | 'grpc' | 'httpupgrade' | 'splithttp' | 'h2'
+export type NodeTransport = 'tcp' | 'ws' | 'grpc' | 'httpupgrade' | 'splithttp' | 'xhttp' | 'h2'
 
 export interface Node {
   id: string
@@ -78,6 +78,7 @@ export interface AppSettings {
   pingTestURL: string
   customGeoSources: string
   exclusions: string
+  urlTestMode: string
   urlTestTimeout: number
   urlTestConcurrency: number
 }

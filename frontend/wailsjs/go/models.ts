@@ -63,6 +63,7 @@ export namespace models {
 	    pingTestURL: string;
 	    customGeoSources: string;
 	    exclusions: string;
+	    urlTestMode: string;
 	    urlTestTimeout: number;
 	    urlTestConcurrency: number;
 	
@@ -111,6 +112,7 @@ export namespace models {
 	        this.pingTestURL = source["pingTestURL"];
 	        this.customGeoSources = source["customGeoSources"];
 	        this.exclusions = source["exclusions"];
+	        this.urlTestMode = source["urlTestMode"];
 	        this.urlTestTimeout = source["urlTestTimeout"];
 	        this.urlTestConcurrency = source["urlTestConcurrency"];
 	    }

@@ -188,9 +188,13 @@ func generatePrimaryOutbound(node models.Node, settings models.AppSettings) map[
 			},
 		}
 	case models.ProtocolVLess:
+		encryption := node.Encryption
+		if encryption == "" {
+			encryption = "none"
+		}
 		user := map[string]interface{}{
 			"id":         node.UUID,
-			"encryption": node.Encryption,
+			"encryption": encryption,
 		}
 		if node.Flow != "" {
 			user["flow"] = node.Flow
@@ -332,9 +336,19 @@ func generateStreamSettings(node models.Node, settings models.AppSettings) map[s
 			httpSettings["path"] = node.Path
 		}
 		if node.Host != "" {
-			httpSettings["host"] = []string{node.Host}
+			httpSettings["host"] = node.Host
 		}
-		stream["httpSettings"] = httpSettings
+		stream["splithttpSettings"] = httpSettings
+
+	case models.TransportXHTTP:
+		httpSettings := map[string]interface{}{}
+		if node.Path != "" {
+			httpSettings["path"] = node.Path
+		}
+		if node.Host != "" {
+			httpSettings["host"] = node.Host
+		}
+		stream["xhttpSettings"] = httpSettings
 	}
 
 	return stream

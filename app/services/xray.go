@@ -241,7 +241,35 @@ func (x *XrayService) TestLatencyConnect(host string, port int, timeout time.Dur
 	return &latency
 }
 
-func (x *XrayService) URLTest(nodes []models.Node, timeout float64, concurrency int, onNodeComplete func(nodeID string, delay *int)) {
+func (x *XrayService) TestLatencyHTTP(host string, port int, timeout time.Duration) *int {
+	addr := fmt.Sprintf("http://%s:%d", host, port)
+	client := &http.Client{
+		Timeout: timeout,
+		Transport: &http.Transport{
+			DialContext: (&net.Dialer{
+				Timeout:   timeout,
+				DualStack: true,
+			}).DialContext,
+			TLSHandshakeTimeout:   timeout,
+			ResponseHeaderTimeout:  timeout,
+			DisableKeepAlives:      true,
+			DisableCompression:     true,
+			MaxIdleConns:           1,
+			MaxIdleConnsPerHost:    1,
+			IdleConnTimeout:        timeout,
+		},
+	}
+	start := time.Now()
+	resp, err := client.Get(addr)
+	if err != nil {
+		return nil
+	}
+	resp.Body.Close()
+	latency := int(time.Since(start).Milliseconds())
+	return &latency
+}
+
+func (x *XrayService) URLTest(nodes []models.Node, timeout float64, concurrency int, mode string, onNodeComplete func(nodeID string, delay *int)) {
 	var wg sync.WaitGroup
 	sem := make(chan struct{}, concurrency)
 
@@ -252,7 +280,12 @@ func (x *XrayService) URLTest(nodes []models.Node, timeout float64, concurrency 
 			defer wg.Done()
 			defer func() { <-sem }()
 
-			dur := x.TestLatencyConnect(n.Address, n.Port, time.Duration(timeout*float64(time.Second)))
+			var dur *int
+			if mode == "http" {
+				dur = x.TestLatencyHTTP(n.Address, n.Port, time.Duration(timeout*float64(time.Second)))
+			} else {
+				dur = x.TestLatencyConnect(n.Address, n.Port, time.Duration(timeout*float64(time.Second)))
+			}
 			onNodeComplete(n.ID, dur)
 		}(node)
 	}

@@ -170,7 +170,7 @@
     </div>
 
     <!-- Transport-specific fields -->
-    <template v-if="['ws', 'h2', 'httpupgrade', 'splithttp'].includes(model.transport)">
+    <template v-if="['ws', 'h2', 'httpupgrade', 'splithttp', 'xhttp'].includes(model.transport)">
       <FormField label="Host">
         <input
           :value="model.host"
@@ -254,6 +254,7 @@ const transports: { value: NodeTransport; label: string }[] = [
   { value: 'h2', label: 'H2' },
   { value: 'httpupgrade', label: 'HUP' },
   { value: 'splithttp', label: 'SHT' },
+  { value: 'xhttp', label: 'XHTTP' },
 ]
 
 const ciphers = ['aes-128-gcm', 'aes-256-gcm', 'chacha20-poly1305', 'none']

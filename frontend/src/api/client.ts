@@ -77,6 +77,9 @@ class APIClient {
   async addLocalNode(node: any) {
     return this.call<any[]>(() => GoApp.AddLocalNode(node), 'AddLocalNode')
   }
+  async addLocalNodes(nodes: any[]) {
+    return this.call<any[]>(() => GoApp.AddLocalNodes(nodes), 'AddLocalNodes')
+  }
   async updateLocalNode(node: any) {
     return this.call<any[]>(() => GoApp.UpdateLocalNode(node), 'UpdateLocalNode')
   }

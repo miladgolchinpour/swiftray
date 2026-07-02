@@ -186,7 +186,7 @@ func (s *SubscriptionService) parseJSONOutbound(ob map[string]interface{}) (mode
 	}
 
 	if stream, ok := ob["streamSettings"].(map[string]interface{}); ok {
-		node.Transport = models.NodeTransport(fmt.Sprintf("%v", stream["network"]))
+		node.Transport = models.NormalizeTransport(models.NodeTransport(fmt.Sprintf("%v", stream["network"])))
 		if sec, ok := stream["security"].(string); ok && sec == "tls" {
 			node.TLS = true
 			if tlsSettings, ok := stream["tlsSettings"].(map[string]interface{}); ok {
@@ -314,10 +314,13 @@ func (s *SubscriptionService) parseVLess(raw string) (models.Node, error) {
 		}
 		q, _ := url.ParseQuery(strings.TrimPrefix(params, "?"))
 		if t := q.Get("type"); t != "" {
-			node.Transport = models.NodeTransport(t)
+			node.Transport = models.NormalizeTransport(models.NodeTransport(t))
 		}
 		security := q.Get("security")
 		node.TLS = security == "tls" || security == "reality"
+		if !node.TLS && q.Get("sni") != "" {
+			node.TLS = true
+		}
 		node.SNI = q.Get("sni")
 		node.Fingerprint = q.Get("fp")
 		node.ALPN = q.Get("alpn")
@@ -374,7 +377,7 @@ func (s *SubscriptionService) parseTrojan(raw string) (models.Node, error) {
 		}
 		q, _ := url.ParseQuery(strings.TrimPrefix(params, "?"))
 		if t := q.Get("type"); t != "" {
-			node.Transport = models.NodeTransport(t)
+			node.Transport = models.NormalizeTransport(models.NodeTransport(t))
 		}
 		security := q.Get("security")
 		if security == "" {

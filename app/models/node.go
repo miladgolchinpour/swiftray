@@ -24,6 +24,7 @@ const (
 	TransportGRPC         NodeTransport = "grpc"
 	TransportHTTPUpgrade  NodeTransport = "httpupgrade"
 	TransportSplitHTTP    NodeTransport = "splithttp"
+	TransportXHTTP        NodeTransport = "xhttp"
 	TransportHTTP         NodeTransport = "h2"
 )
 
@@ -183,4 +184,11 @@ func (n Node) SecurityOrAuto() string {
 		return n.Security
 	}
 	return "auto"
+}
+
+func NormalizeTransport(t NodeTransport) NodeTransport {
+	if t == TransportXHTTP {
+		return TransportSplitHTTP
+	}
+	return t
 }

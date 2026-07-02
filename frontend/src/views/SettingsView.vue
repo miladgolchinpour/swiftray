@@ -89,6 +89,8 @@
             <ToggleRow v-if="platformDisplay !== 'Linux'" v-model="store.settings.enableMenuBar" label="Enable Menu Bar" subtitle="Show status in menu bar" />
           </SettingsSection>
           <SettingsSection title="Testing" icon="radio" icon-bg="bg-yellow-500">
+            <SelectRow :model-value="store.settings.urlTestMode" label="URL Test Mode" :options="urlTestModeOptions" @update:model-value="store.settings.urlTestMode = String($event)" />
+            <div class="border-t border-border" />
             <TextFieldRow v-model="store.settings.pingTestURL" label="Ping Test URL" placeholder="https://www.google.com/generate_204" />
             <div class="border-t border-border" />
             <NumberRow :model-value="store.settings.urlTestTimeout" label="URL Test Timeout" :min="1" :max="10" :step="0.5" format="decimal" @update:model-value="store.settings.urlTestTimeout = $event" />
@@ -194,6 +196,10 @@ const fingerprintOptions = [
   { label: 'chrome', value: 'chrome' }, { label: 'firefox', value: 'firefox' },
   { label: 'safari', value: 'safari' }, { label: 'edge', value: 'edge' },
   { label: 'random', value: 'random' }, { label: 'randomized', value: 'randomized' },
+]
+const urlTestModeOptions = [
+  { label: 'TCP Connect', value: 'tcp' },
+  { label: 'HTTP GET', value: 'http' },
 ]
 
 const resourceReady = computed(() => resourceStatus.value?.xrayExists && resourceStatus.value?.geoIPExists && resourceStatus.value?.geoSiteExists)

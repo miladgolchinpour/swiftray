@@ -6,6 +6,10 @@ export function AddLocalNode(arg1) {
   return window['go']['main']['App']['AddLocalNode'](arg1);
 }
 
+export function AddLocalNodes(arg1) {
+  return window['go']['main']['App']['AddLocalNodes'](arg1);
+}
+
 export function AddSubscription(arg1, arg2) {
   return window['go']['main']['App']['AddSubscription'](arg1, arg2);
 }

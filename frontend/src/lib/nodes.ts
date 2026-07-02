@@ -164,11 +164,21 @@ export function configJSON(node: Node): string {
     streamSettings.wsSettings = ws
   } else if (node.transport === 'grpc') {
     if (node.serviceName) streamSettings.grpcSettings = { serviceName: node.serviceName }
-  } else if (['h2', 'httpupgrade', 'splithttp'].includes(node.transport)) {
+  } else if (node.transport === 'h2' || node.transport === 'httpupgrade') {
     const hs: any = {}
     if (node.path) hs.path = node.path
     if (node.host) hs.host = [node.host]
     streamSettings.httpSettings = hs
+  } else if (node.transport === 'splithttp') {
+    const hs: any = {}
+    if (node.path) hs.path = node.path
+    if (node.host) hs.host = node.host
+    streamSettings.splithttpSettings = hs
+  } else if (node.transport === 'xhttp') {
+    const hs: any = {}
+    if (node.path) hs.path = node.path
+    if (node.host) hs.host = node.host
+    streamSettings.xhttpSettings = hs
   }
 
   const outbound = { protocol: proto, settings, streamSettings }
